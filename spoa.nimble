@@ -9,4 +9,4 @@ skipDirs      = @[".vscode", "tests"]
 
 # Dependencies
 
-requires "nim >= 2.2.0", "chronos >= 4.0.3"
+requires "nim >= 2.2.0", "chronos >= 4.0.3", "ba0f3 >= 0.1.1"
