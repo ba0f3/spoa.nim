@@ -1,9 +1,21 @@
 import std/[posix, streams]
 from std/strutils import toHex
 import chronos/streams/asyncstream
-import common, utils
+import utils
 
 type
+  SpoeDataKind* = enum
+    NULL
+    BOOLEAN
+    INT32
+    UINT32
+    INT64
+    UINT64
+    IPV4
+    IPV6
+    STRING
+    BINARY
+
   SpoeTypedData* = object
     case kind*: SpoeDataKind
     of BOOLEAN: b*: bool
@@ -24,13 +36,13 @@ proc `$`*(data: SpoeTypedData): string =
   of BOOLEAN:
     result = $data.b
   of INT32:
-    result = $data.i32 & "'i32"
+    result = $data.i32 # & "'i32"
   of UINT32:
-    result = $data.u32 & "'u32"
+    result = $data.u32 # & "'u32"
   of INT64:
-    result = $data.i64 & "'i64"
+    result = $data.i64 # & "'i64"
   of UINT64:
-    result = $data.u64 & "'u64"
+    result = $data.u64 # & "'u64"
   of IPV4:
     let ip = inet_ntoa(data.v4)
     result = $ip
@@ -63,7 +75,7 @@ proc toTypedData*(v: auto): SpoeTypedData =
   elif v is string:
     result = SpoeTypedData(kind: STRING, s: v)
   else:
-    raise newException(ValueError, "Unsupported data type " & v.type)
+    raise newException(ValueError, "Unsupported data type " & $v.type)
 
 proc readTypedData*(reader: AsyncStreamReader, bytesRead: ptr uint64): Future[SpoeTypedData] {.async.} =
   var tmp: uint8

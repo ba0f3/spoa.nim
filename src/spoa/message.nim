@@ -3,11 +3,15 @@ import ba0f3/logger
 import kv, utils
 
 type
-  SpoeMessage* = object
+  SpoeMessage* = ref object
     name*: string
     list*: seq[SpoeKV]
 
+proc new*(ctype: typedesc[SpoeMessage]): SpoeMessage =
+  result = SpoeMessage()
+
 proc readMessage*(reader: AsyncStreamReader, bytesRead: ptr uint64): Future[SpoeMessage] {.async: (raises: [Exception]).} =
+  result = SpoeMessage.new()
   result.name = await reader.readString(bytesRead)
 
   var nbArgs: uint8

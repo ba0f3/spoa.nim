@@ -1,6 +1,5 @@
 import std/[posix, streams]
 import chronos/streams/asyncstream
-import ba0f3/hexdump
 import kv, message, action, typeddata, utils
 
 type
@@ -42,9 +41,6 @@ proc addMessage*(frame: SpoeFrame, name: string, kv: seq[SpoeKV]) =
   let message = SpoeMessage(name: name, list: kv)
   frame.messages.add(message)
 
-proc addAction*(frame: SpoeFrame, kind: SpoeActionKind, kv: seq[SpoeKV]) =
-  let action = SpoeAction(kind: kind, list: kv)
-  frame.actions.add(action)
 
 proc addKV*(frame: SpoeFrame, key: string, value: auto) =
   frame.list.add(SpoeKV(key: key, value: toTypedData(value)))
@@ -98,16 +94,7 @@ proc write*(writer: AsyncStreamWriter, frame: SpoeFrame) {.async.} =
       stream.writeKV(kv)
 
   for action in frame.actions:
-    # write active-type
-    stream.writeData(addr action.kind, 1)
-
-    # write nb-args
-    var argsLen = action.list.len
-    stream.writeData(addr argsLen, 1)
-
-    # write kv-list
-    for kv in action.list:
-      stream.writeKV(kv)
+    stream.writeAction(action)
 
   # write kv-list
   for kv in frame.list:
@@ -115,9 +102,7 @@ proc write*(writer: AsyncStreamWriter, frame: SpoeFrame) {.async.} =
 
   frameLength = htonl(stream.getPosition().uint32)
   stream.setPosition(0)
-  let data = stream.readAll()
-  hexdump(data.cstring, ntohl(frameLength).int)
   await writer.write(addr frameLength, sizeof(uint32))
-  await writer.write(data)
+  await writer.write(stream.readAll())
   await writer.finish()
 

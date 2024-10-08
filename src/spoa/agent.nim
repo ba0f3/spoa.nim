@@ -5,8 +5,8 @@ import common, client
 
 export SpoeAgent
 
-proc new*(ctype: typedesc[SpoeAgent], address = "127.0.0.1:12345", pipelining = true): SpoeAgent =
-  result = SpoeAgent(address: address, pipelining: pipelining)
+proc new*(ctype: typedesc[SpoeAgent], handler: SpoeHandler, address = "127.0.0.1:12345", pipelining = true): SpoeAgent =
+  result = SpoeAgent(address: address, pipelining: pipelining, handler: handler)
   result.maxFrameSize = MAX_FRAME_SIZE
 
 proc close*(agent: SpoeAgent) {.async.} =

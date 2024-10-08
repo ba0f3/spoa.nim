@@ -1,6 +1,5 @@
 import std/streams
 import chronos/streams/asyncstream
-import ba0f3/logger
 import typeddata, utils
 
 type
@@ -12,9 +11,6 @@ proc readKV*(reader: AsyncStreamReader, bytesRead: ptr uint64): Future[SpoeKV] {
   let
     key = await reader.readString(bytesRead)
     value = await reader.readTypedData(bytesRead)
-
-  debug "kv", key, value
-
   result = SpoeKV(
     key: key,
     value: value

@@ -1,7 +1,7 @@
 from std/strutils import split, strip
 import chronos
-import ba0f3/[logger, hexdump]
-import common, frame, message, typeddata, utils
+import ba0f3/logger
+import common, frame, message, request, typeddata, utils
 
 
 
@@ -155,28 +155,29 @@ proc handleHello(client: SpoeClient, header: SpoeFrameHeader): Future[SpoeFrameE
   if client.healthcheck:
     await client.disconnect()
 
-
 proc handleNotify(client: SpoeClient, header: SpoeFrameHeader): Future[SpoeFrameError] {.async: (raises: [Exception]).} =
   if (header.flags and SPOE_FRAME_FLAG_FIN) == 0:
     return ERROR_FRAG_NOT_SUPPORTED
-  if header.streamId == 0 or header.frameId == 0:
-    return ERROR_INVALID
+  elif header.frameId == 0:
+    return ERROR_FRAMEID_NOTFOUND
 
-  debug "HAProxy notify"
+  debug "HAProxy notify", streamId=header.streamId, frameId=header.frameId
 
-  var message: SpoeMessage
+  var messages: seq[SpoeMessage]
   while header.bytesRead < header.length:
-    message = await client.reader.readMessage(addr header.bytesRead)
-    echo message
+    let message = await client.reader.readMessage(addr header.bytesRead)
+    messages.add(message)
+
+  var req = SpoeRequest.new(header.streamId, header.frameId)
+  client.agent.handler(req)
 
   var frame = SpoeFrame.new(ACK)
   frame.streamId = header.streamId
   frame.frameId = header.frameId
+  frame.actions = req.actions
 
+  debug "Sending ACK response frame", streamId=header.streamId, frameId=header.frameId
   await client.writer.write(frame)
-
-  #await client.disconnect()
-
 
 proc handleDisconnect(client: SpoeClient, header: SpoeFrameHeader): Future[SpoeFrameError] {.async: (raises: [Exception]).} =
   if (header.flags and SPOE_FRAME_FLAG_FIN) == 0:
@@ -189,7 +190,6 @@ proc handleDisconnect(client: SpoeClient, header: SpoeFrameHeader): Future[SpoeF
     value: SpoeTypedData
     statusCode: uint32
     message: string
-
 
   while header.bytesRead < header.length:
     key = await client.reader.readString(addr header.bytesRead)
@@ -228,8 +228,6 @@ proc handleConnection*(client: SpoeClient) {.async: (raises: [Exception]).} =
       return
     try:
       header = await client.reader.readFrameHeader()
-      echo header
-
       if header.length > client.maxFrameSize:
         await client.disconnect(ERROR_TOO_BIG)
         return

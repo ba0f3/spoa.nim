@@ -1,8 +1,8 @@
 # Package
 
-version       = "0.1.0"
+version       = "0.1.1"
 author        = "Huy Doan"
-description   = "A new awesome nimble package"
+description   = "HAProxy Stream Processing Offload Agent"
 license       = "MIT"
 srcDir        = "src"
 skipDirs      = @[".vscode", "tests"]

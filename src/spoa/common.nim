@@ -1,5 +1,6 @@
 import std/posix
 import chronos
+from request import SpoeRequest
 
 const
   MAX_FRAME_SIZE* = 16384
@@ -9,17 +10,7 @@ const
   SPOE_FRAME_FLAG_ABORT* = 0x00000002
 
 type
-  SpoeDataKind* = enum
-    NULL
-    BOOLEAN
-    INT32
-    UINT32
-    INT64
-    UINT64
-    IPV4
-    IPV6
-    STRING
-    BINARY
+
 
   SpoeFrameError* = enum
     ERROR_NONE = 0
@@ -38,8 +29,11 @@ type
     ERROR_RES
     ERROR_UNKNOWN = 99
 
+  SpoeHandler* = proc(req: SpoeRequest) {.gcsafe.}
+
   SpoeAgent* = ref object
     address*: string
     maxFrameSize*: uint32
     pipelining*: bool
     done*: Future[void]
+    handler*: SpoeHandler
