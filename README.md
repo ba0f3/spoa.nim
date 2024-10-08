@@ -1,9 +1,10 @@
+HAProxy SPOA for Nim
+====
+
+```nim
 import ba0f3/logger
 from chronos import waitFor
-import spoa/[agent, action, request]
-
-export agent, request, SpoeActionScope
-
+import spoa
 
 when isMainModule:
   proc handler(req: SpoeRequest) {.gcsafe.} =
@@ -17,3 +18,4 @@ when isMainModule:
 
   initLogger(level=lvlInfo)
   waitFor SpoeAgent.new(handler, "0.0.0.0:12345").run()
+```
