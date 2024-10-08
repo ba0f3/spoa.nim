@@ -1,13 +1,42 @@
 import std/[posix, streams]
-import types, utils
+import chronos/streams/asyncstream
+import ba0f3/hexdump
+import kv, message, action, typeddata, utils
 
-proc newFrame*(kind: SpoeFrameKind): SpoeFrame =
-  new(result)
-  result.kind = kind
-  result.flags = 0x1
-  #result.maxFrameSize = maxFrameSize
-  result.streamId = 0
-  result.frameId = 0
+type
+  SpoeFrameKind* = enum
+    UNSET
+    HAPROXY_HELLO
+    HAPROXY_DISCONNECT
+    NOTIFY
+    AGENT_HELLO = 101
+    AGENT_DISCONNECT
+    ACK
+
+  SpoeFrameHeader* = object
+    length*: uint32
+    bytesRead*: uint64
+    kind*: SpoeFrameKind
+    flags*: uint32
+    streamId*: uint64
+    frameId*: uint64
+
+  SpoeFrame* = ref object
+    kind*: SpoeFrameKind
+    flags*: uint32
+    streamId*: uint64
+    frameId*: uint64
+    messages*: seq[SpoeMessage]
+    actions*: seq[SpoeAction]
+    list*: seq[SpoeKV]
+
+proc new*(ctype: typedesc[SpoeFrame], kind: SpoeFrameKind): SpoeFrame =
+  result = SpoeFrame(
+    kind: kind,
+    flags: 0x1,
+    streamId: 0,
+    frameId: 0
+  )
 
 proc addMessage*(frame: SpoeFrame, name: string, kv: seq[SpoeKV]) =
   let message = SpoeMessage(name: name, list: kv)
@@ -20,16 +49,33 @@ proc addAction*(frame: SpoeFrame, kind: SpoeActionKind, kv: seq[SpoeKV]) =
 proc addKV*(frame: SpoeFrame, key: string, value: auto) =
   frame.list.add(SpoeKV(key: key, value: toTypedData(value)))
 
-proc writeFrame*(stream: StringStream, frame: SpoeFrame): int =
-  let lastPos = stream.getPosition()
+proc readFrameHeader*(reader: AsyncStreamReader): Future[SpoeFrameHeader] {.async.} =
+  ## Returns header's size
+  await reader.readExactly(addr result.length, sizeof(uint32))
+  result.length = ntohl(result.length)
 
+  result.bytesRead = 0
+  await reader.readExactly(addr result.kind, sizeof(SpoeFrameKind))
+  inc(result.bytesRead, sizeof(SpoeFrameKind))
+  await reader.readExactly(addr result.flags, sizeof(uint32))
+  inc(result.bytesRead, sizeof(uint32))
+
+  result.flags = ntohl(result.flags)
+
+  var tmp: uint64
+  discard await reader.decodeVarint(addr tmp, addr result.bytesRead)
+  result.streamId = tmp
+  discard await reader.decodeVarint(addr tmp, addr result.bytesRead)
+  result.frameId = tmp
+
+proc write*(writer: AsyncStreamWriter, frame: SpoeFrame) {.async.} =
   var
     buf: array[10, uint8]
     ret: int
-    frameLength: uint32 = 0
     flags = htonl(frame.flags)
+    frameLength: uint32
 
-  #stream.writeData(addr frameLength, 4)
+  var stream = newStringStream()
   stream.writeData(addr frame.kind, sizeof(SpoeFrameKind))
   stream.writeData(addr flags, sizeof(uint32))
 
@@ -67,13 +113,11 @@ proc writeFrame*(stream: StringStream, frame: SpoeFrame): int =
   for kv in frame.list:
     stream.writeKV(kv)
 
-  let savePos = stream.getPosition()
-  #stream.setPosition(lastPos)
-  result = savePos - lastPos
-  #frameLength = htonl(result.uint32 - 4)
+  frameLength = htonl(stream.getPosition().uint32)
+  stream.setPosition(0)
+  let data = stream.readAll()
+  hexdump(data.cstring, ntohl(frameLength).int)
+  await writer.write(addr frameLength, sizeof(uint32))
+  await writer.write(data)
+  await writer.finish()
 
-  # write frame-length
-  #stream.setPosition(lastPos)
-  #stream.writeData(addr frameLength, 4)
-
-  #stream.setPosition(savePos)

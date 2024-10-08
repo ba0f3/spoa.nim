@@ -1,0 +1,11 @@
+services:
+  haproxy:
+    container_name: my-running-haproxy
+    ports:
+      - 10001:10001
+    volumes:
+      - ./config:/usr/local/etc/haproxy:ro
+    sysctls:
+      - net.ipv4.ip_unprivileged_port_start=0
+    image: haproxy
+    command: haproxy -f /usr/local/etc/haproxy/haproxy.cfg
