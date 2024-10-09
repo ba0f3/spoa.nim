@@ -8,4 +8,4 @@ services:
     sysctls:
       - net.ipv4.ip_unprivileged_port_start=0
     image: haproxy
-    command: haproxy -f /usr/local/etc/haproxy/haproxy.cfg -Ws
+    command: haproxy -f /usr/local/etc/haproxy/haproxy.cfg -d -Ws
