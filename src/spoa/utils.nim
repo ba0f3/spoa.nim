@@ -17,7 +17,7 @@ proc encodeVarint*(buf: var array[10, uint8], n: uint64): int =
   buf[result] = u.uint8
   inc(result)
 
-proc decodeVarint*(reader: AsyncStreamReader, value: ptr uint64, bytesRead: ptr uint64): Future[int] {.async: (raises: [AsyncStreamError, CancelledError]).} =
+proc decodeVarint*(reader: AsyncStreamReader, value: ptr uint64, bytesRead: ptr uint64): Future[int] {.async.} =
   ##[
   Decodes a variable length integer from a stream into an unsigned 64-bit integer.
   Returns: The number of bytes read on success or -1 if not enough data was available in the stream.

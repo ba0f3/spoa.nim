@@ -1,5 +1,5 @@
 import std/streams
-import typeddata, utils
+import ./[typeddata, utils]
 
 const
   NB_ARGS_SET = 3

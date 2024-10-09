@@ -1,19 +1,20 @@
-import ba0f3/logger
 from chronos import waitFor
-import spoa/[agent, action, request]
+import spoa/[agent, action, common, kv, request, typeddata]
 
-export agent, request, SpoeActionScope
+export common, agent, request, kv, request, typeddata, SpoeActionScope, waitFor
 
 
 when isMainModule:
   proc handler(req: SpoeRequest) {.gcsafe.} =
-    info "handle request", streamId=req.streamId, frameId=req.frameId
+    echo "Handle request streamId=", req.streamId, " frameId=", req.frameId
 
     let message = req.getMessage("spoe-req")
     if message != nil:
-      echo message[]
-    req.setVar(ScopeTransaction, "action", "redirect")
-    req.setVar(ScopeTransaction, "data", "/hello-world")
+      echo "Input args:"
+      for key in message.keys:
+        echo "\tkey: ", key, "\tvalue:", message.getArg(key)
+      req.setVar(ScopeTransaction, "action", "redirect")
+      req.setVar(ScopeTransaction, "data", "/hello-world")
 
-  initLogger(level=lvlInfo)
-  waitFor SpoeAgent.new(handler, "0.0.0.0:12345").run()
+  let address = "0.0.0.0:12345"
+  waitFor SpoeAgent.new(handler, address).run()

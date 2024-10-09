@@ -1,6 +1,6 @@
 import std/[posix, streams]
 import chronos/streams/asyncstream
-import kv, message, action, typeddata, utils
+import ./[kv, action, typeddata, utils]
 
 type
   SpoeFrameKind* = enum
@@ -25,7 +25,7 @@ type
     flags*: uint32
     streamId*: uint64
     frameId*: uint64
-    messages*: seq[SpoeMessage]
+    #messages*: seq[SpoeMessage]
     actions*: seq[SpoeAction]
     list*: seq[SpoeKV]
 
@@ -37,17 +37,20 @@ proc new*(ctype: typedesc[SpoeFrame], kind: SpoeFrameKind): SpoeFrame =
     frameId: 0
   )
 
-proc addMessage*(frame: SpoeFrame, name: string, kv: seq[SpoeKV]) =
-  let message = SpoeMessage(name: name, list: kv)
-  frame.messages.add(message)
+#proc addMessage*(frame: SpoeFrame, name: string, kv: seq[SpoeKV]) =
+#  let message = SpoeMessage(name: name, list: kv)
+#  frame.messages.add(message)
 
 
 proc addKV*(frame: SpoeFrame, key: string, value: auto) =
   frame.list.add(SpoeKV(key: key, value: toTypedData(value)))
 
-proc readFrameHeader*(reader: AsyncStreamReader): Future[SpoeFrameHeader] {.async.} =
-  ## Returns header's size
-  await reader.readExactly(addr result.length, sizeof(uint32))
+proc readFrameHeader*(reader: AsyncStreamReader): Future[SpoeFrameHeader] {.async: (raises: [IOError, CancelledError, CatchableError]).} =
+  var ret: int
+  ret = await reader.readOnce(addr result.length, sizeof(uint32))
+  if ret != sizeof(uint32):
+    raise newException(IOError, "Unable to read frame length")
+
   result.length = ntohl(result.length)
 
   result.bytesRead = 0
@@ -81,17 +84,17 @@ proc write*(writer: AsyncStreamWriter, frame: SpoeFrame) {.async.} =
   ret = encodeVarint(buf, frame.frameId)
   stream.writeData(addr buf, ret)
 
-  for message in frame.messages:
-    # write name
-    stream.writeString(message.name)
+  #for message in frame.messages:
+  #  # write name
+  #  stream.writeString(message.name)
 
     # write nb-args
-    var argsLen = message.list.len
-    stream.writeData(addr argsLen, 1)
+#    var argsLen = message.list.len
+#    stream.writeData(addr argsLen, 1)
 
     # write kv-list
-    for kv in message.list:
-      stream.writeKV(kv)
+#    for kv in message.list:
+#      stream.writeKV(kv)
 
   for action in frame.actions:
     stream.writeAction(action)
@@ -104,5 +107,5 @@ proc write*(writer: AsyncStreamWriter, frame: SpoeFrame) {.async.} =
   stream.setPosition(0)
   await writer.write(addr frameLength, sizeof(uint32))
   await writer.write(stream.readAll())
-  await writer.finish()
+  #await writer.finish()
 

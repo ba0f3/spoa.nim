@@ -1,7 +1,7 @@
 import std/[posix, streams]
 from std/strutils import toHex
 import chronos/streams/asyncstream
-import utils
+import ./[utils]
 
 type
   SpoeDataKind* = enum
@@ -17,16 +17,16 @@ type
     BINARY
 
   SpoeTypedData* = object
-    case kind*: SpoeDataKind
-    of BOOLEAN: b*: bool
-    of INT32: i32*: int32
-    of UINT32: u32*: uint32
-    of INT64: i64*: int64
-    of UINT64: u64*: uint64
-    of IPV4: v4*: InAddr
-    of IPV6: v6*: In6Addr
+    case kind: SpoeDataKind
+    of BOOLEAN: b: bool
+    of INT32: i32: int32
+    of UINT32: u32: uint32
+    of INT64: i64: int64
+    of UINT64: u64: uint64
+    of IPV4: v4: InAddr
+    of IPV6: v6: In6Addr
     of STRING, BINARY:
-      s*: string
+      s: string
     else: discard
 
 proc `$`*(data: SpoeTypedData): string =
@@ -36,13 +36,13 @@ proc `$`*(data: SpoeTypedData): string =
   of BOOLEAN:
     result = $data.b
   of INT32:
-    result = $data.i32 # & "'i32"
+    result = $data.i32
   of UINT32:
-    result = $data.u32 # & "'u32"
+    result = $data.u32
   of INT64:
-    result = $data.i64 # & "'i64"
+    result = $data.i64
   of UINT64:
-    result = $data.u64 # & "'u64"
+    result = $data.u64
   of IPV4:
     let ip = inet_ntoa(data.v4)
     result = $ip
@@ -51,22 +51,78 @@ proc `$`*(data: SpoeTypedData): string =
     let r = inet_ntop(AF_INET6, addr data.v6, cast[cstring](addr buff[0]), buff.len.int32)
     result = $r
   of STRING:
-    result = "\"" & data.s & "\""
+    result = data.s
   of BINARY:
     result = toHex(data.s)
 
+proc isNull*(data: SpoeTypedData): bool {.inline.} = data.kind == NULL
 
+proc isBool*(data: SpoeTypedData): bool {.inline.} = data.kind == BOOLEAN
+
+proc isString*(data: SpoeTypedData): bool {.inline.} = data.kind == STRING
+
+proc isSignedInt*(data: SpoeTypedData): bool {.inline.} = data.kind == INT32 or data.kind == INT64
+
+proc isUnsignedInt*(data: SpoeTypedData): bool {.inline.} = data.kind == UINT32 or data.kind == UINT64
+
+proc isIPv4*(data: SpoeTypedData): bool {.inline.} = data.kind == IPV4
+
+proc isIPv6*(data: SpoeTypedData): bool {.inline.} = data.kind == IPV6
+
+proc isBinary*(data: SpoeTypedData): bool {.inline.} = data.kind == BINARY
+
+proc getBool*(data: SpoeTypedData): bool {.inline.} =
+  if data.isBool:
+    result = data.b
+
+proc getInt*(data: SpoeTypedData): int {.inline.} =
+  if data.kind == INT32:
+    result = data.i32.int
+  elif data.kind == INT64:
+    result = data.i64.int
+
+proc getBiggestInt*(data: SpoeTypedData): BiggestInt {.inline.} =
+  if data.kind == INT32:
+    result = data.i32.BiggestInt
+  elif data.kind == INT64:
+    result = data.i64.BiggestInt
+
+proc getUInt*(data: SpoeTypedData): uint {.inline.} =
+  if data.kind == UINT32:
+    result = data.u32.uint
+  elif data.kind == UINT64:
+    result = data.u64.uint
+
+proc getBiggestUInt*(data: SpoeTypedData): BiggestUInt {.inline.} =
+  if data.kind == UINT32:
+    result = data.u32.BiggestUInt
+  elif data.kind == UINT64:
+    result = data.u64.BiggestUInt
+
+proc getIPv4*(data: SpoeTypedData): InAddr {.inline.} =
+  if data.kind == IPV4:
+    result = data.v4
+
+proc getIPv6*(data: SpoeTypedData): In6Addr {.inline.} =
+  if data.kind == IPV6:
+    result = data.v6
+
+proc getStr*(data: SpoeTypedData): string {.inline.} =
+  if data.kind == STRING or data.kind == BINARY:
+    result = data.s
 
 proc toTypedData*(v: auto): SpoeTypedData =
-  when v is bool:
+  when v is nil.type:
+    result = SpoeTypedData(kind: NULL)
+  elif v is bool:
     result = SpoeTypedData(kind: BOOLEAN, b: v)
   elif v is int32:
     result = SpoeTypedData(kind: INT32, i32: v)
   elif v is uint32:
     result = SpoeTypedData(kind: UINT32, u32: v)
-  elif v is int64:
+  elif v is SomeSignedInt:
     result = SpoeTypedData(kind: INT64, i64: v)
-  elif v is uint64:
+  elif v is SomeUnsignedInt:
     result = SpoeTypedData(kind: UINT64, u64: v)
   elif v is InAddr:
     result = SpoeTypedData(kind: IPV4, v4: v)
